@@ -2,12 +2,13 @@ package session
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	jwt "github.com/dgrijalva/jwt-go"
+	//	"encoding/json"
+	//	"errors"
+	//	jwt "github.com/dgrijalva/jwt-go"
 	eh "github.com/looplab/eventhorizon"
 	"github.com/superchalupa/go-redfish/domain"
-	"github.com/superchalupa/go-redfish/provider"
+	"github.com/superchalupa/go-redfish/server"
+	//	"github.com/superchalupa/go-redfish/provider"
 	"math/rand"
 	"net/http"
 	"time"
@@ -17,6 +18,11 @@ import (
 
 var _ = fmt.Println
 
+//****************************************************************************
+// Token Refresh Event handling
+//  - token refresh is emitted by the http handler when we detect a valid token
+//  on a request
+//****************************************************************************
 const (
 	XAuthTokenRefreshEvent eh.EventType = "XAuthTokenRefresh"
 )
@@ -25,15 +31,25 @@ type XAuthTokenRefreshData struct {
 	SessionURI string
 }
 
-func init() {
-	eh.RegisterEventData(XAuthTokenRefreshEvent, func() eh.EventData { return &XAuthTokenRefreshData{} })
-	domain.Httpsagas = append(domain.Httpsagas, SetupSessionService)
-}
+// End Token Refresh
+//****************************************************************************
 
-type LoginRequest struct {
+//****************************************************************************
+// Token Refresh Event handling
+//  - token refresh is emitted by the http handler when we detect a valid token
+//  on a request
+//****************************************************************************
+const (
+	HTTPSessionStartRequestEvent eh.EventType = "HTTPSessionStartRequest"
+)
+
+type HTTPSessionStartRequestData struct {
 	UserName string
 	Password string
 }
+
+// End Token Refresh
+//****************************************************************************
 
 // This is a fairly slow implementation, but should be good enough for our
 // purposes. This could be optimized to operate in about 1/5th of the time
@@ -100,8 +116,36 @@ func makeBackgroundDeleteSession(d domain.DDDFunctions, sessionURI string, sessi
 	}()
 }
 
-func SetupSessionService(s domain.SagaRegisterer) {
-	s.RegisterNewHandler("DELETE:"+s.GetBaseURI()+"/v1/$metadata#Session.Session", provider.MakeStandardHTTPDelete(s))
+func SetupSessionService(s server.Service) {
+	eh.RegisterEventData(HTTPSessionStartRequestEvent, func() eh.EventData { return &HTTPSessionStartRequestData{} })
+	eh.RegisterEventData(XAuthTokenRefreshEvent, func() eh.EventData { return &XAuthTokenRefreshData{} })
+
+	s.RegisterEventAdapter(
+		"DELETE:"+s.GetBaseURI()+"/v1/$metadata#Session.Session",
+		makeHandleDelete(s),
+	)
+	s.RegisterEventAdatper(
+		"POST:"+s.GetBaseURI()+"/v1/SessionService/Sessions",
+		makeHandlePost(s),
+	)
+	return
+}
+
+func makeHandleDelete(d domain.DDDFunctions) func(context.Context, *http.Request, []string, string, string) error {
+	return func(ctx context.Context, r *http.Request, privileges []string, tree string, requested string) error {
+		fmt.Println("DELETE?")
+	}
+}
+
+func makeHandlePost(d domain.DDDFunctions) func(context.Context, *http.Request, []string, string, string) error {
+	return func(ctx context.Context, r *http.Request, privileges []string, tree string, requested string) error {
+		fmt.Println("POST?")
+	}
+}
+
+/*
+
+	//s.RegisterNewHandler("DELETE:"+s.GetBaseURI()+"/v1/$metadata#Session.Session", provider.MakeStandardHTTPDelete(s))
 
 	// really don't need to have all these functions inline here, should split them out next
 	s.RegisterNewHandler("POST:"+s.GetBaseURI()+"/v1/SessionService/Sessions",
@@ -113,6 +157,25 @@ func SetupSessionService(s domain.SagaRegisterer) {
 			if err != nil {
 				return nil
 			}
+
+			// set up the session redfish resource
+			event := eh.NewEvent(domain.HTTPCmdProcessedEvent,
+				&domain.HTTPCmdProcessedData{
+					CommandID: cmdID,
+					Results:   retprops,
+					Headers: map[string]string{
+						"X-Auth-Token": tokenString,
+						"Location":     sessionURI,
+					},
+				})
+
+			s.GetEventHandler().HandleEvent(ctx, event)
+
+
+
+
+
+
 
 			privileges := []string{}
 			account, err := domain.FindUser(ctx, s, lr.UserName)
@@ -185,3 +248,5 @@ func SetupSessionService(s domain.SagaRegisterer) {
 		})
 
 }
+
+*/
