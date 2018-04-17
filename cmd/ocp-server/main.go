@@ -38,6 +38,20 @@ import (
 func main() {
 	flag.StringSliceP("listen", "l", []string{}, "Listen address.  Formats: (http:[ip]:nn, fcgi:[ip]:port, fcgi:/path, https:[ip]:port, spacemonkey:[ip]:port)")
 
+	intr := make(chan os.Signal, 1)
+	signal.Notify(intr, os.Interrupt)
+	stop := make(chan struct{}, 1)
+
+	go func() {
+		<-intr
+		stop <- struct{}{}
+	}()
+
+	Run("", stop)
+}
+
+func Run(listen string, intr chan struct{}) {
+
 	var cfgMgrMu sync.Mutex
 	cfgMgr := viper.New()
 	if err := cfgMgr.BindPFlags(flag.CommandLine); err != nil {
@@ -56,14 +70,16 @@ func main() {
 	}
 
 	// Defaults
-	cfgMgr.SetDefault("listen", []string{"https::8443"})
+	if listen == "" {
+		cfgMgr.SetDefault("listen", []string{"https::8443"})
+	} else {
+		cfgMgr.SetDefault("listen", []string{listen})
+	}
 	cfgMgr.SetDefault("session.timeout", 10)
 
-	flag.Parse()
+	//flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	intr := make(chan os.Signal, 1)
-	signal.Notify(intr, os.Interrupt)
 
 	logger := initializeApplicationLogging(cfgMgr)
 
