@@ -60,8 +60,7 @@ func (c *POST) CommandType() eh.CommandType     { return POSTCommand }
 func (c *POST) SetAggID(id eh.UUID)             { c.ID = id }
 func (c *POST) SetCmdID(id eh.UUID)             { c.CmdID = id }
 func (c *POST) ParseHTTPRequest(r *http.Request) error {
-	json.NewDecoder(r.Body).Decode(&c.LR)
-	return nil
+	return json.NewDecoder(r.Body).Decode(&c.LR)
 }
 func (c *POST) Handle(ctx context.Context, a *domain.RedfishResourceAggregate) error {
 	privileges := []string{} // no privs

@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
+
+	"github.com/mattn/go-colorable"
 
 	"github.com/gorilla/mux"
 	log "github.com/inconshreveable/log15"
@@ -81,7 +82,7 @@ func (l *MyLogger) setupLogHandlersFromConfig(cfg *viper.Viper) {
 	// TODO: add cli option
 	stderrHandler := log.DiscardHandler()
 	if cfg.GetBool("main.log.EnableStderr") {
-		stderrHandler = log.StreamHandler(os.Stderr, log.TerminalFormat())
+		stderrHandler = log.StreamHandler(colorable.NewColorableStderr(), log.TerminalFormat())
 	}
 
 	// optionally log to file, if enabled on CLI or in config
